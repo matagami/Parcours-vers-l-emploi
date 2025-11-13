@@ -1,4 +1,3 @@
-
 import { ResumeData, BudgetData, ResumeTemplate } from './types';
 
 export const INITIAL_RESUME_DATA: ResumeData = {
@@ -32,3 +31,45 @@ J'ai un DEC en Techniques de l'informatique du Cégep du Vieux Montréal, termin
 
 Mes compétences manuelles sont : Service à la clientèle, gestion du temps, Microsoft Office, et je parle français et anglais.
 `;
+
+export const PREFILLED_RESUME_DATA: ResumeData = {
+  personalInfo: {
+    name: 'Alex Tremblay',
+    email: 'alex.tremblay@exemple.com',
+    phone: '514-123-4567',
+    address: '123 Rue Principale, Montréal, QC H2X 1Y2',
+  },
+  experiences: [
+    {
+      title: 'Barista',
+      company: 'Café Central',
+      startDate: '2020',
+      endDate: 'Présent',
+      description: 'Préparation de cafés spécialisés, service à la clientèle personnalisé et gestion efficace de la caisse dans un environnement à fort volume.',
+    },
+    {
+      title: 'Vendeur',
+      company: 'Mode-Express',
+      startDate: '2018',
+      endDate: '2019',
+      description: 'Conseil client sur les produits, gestion des stocks et de l\'inventaire, et maintien de l\'attrait visuel du magasin.',
+    },
+  ],
+  education: [
+    {
+      degree: 'DEC en Techniques de l\'informatique',
+      institution: 'Cégep du Vieux Montréal',
+      completionDate: '2018',
+    },
+  ],
+  skills: [
+    { name: 'Service à la clientèle', description: '' },
+    { name: 'Gestion de caisse', description: '' },
+    { name: 'Vente et conseil', description: '' },
+    { name: 'Gestion des stocks', description: '' },
+    { name: 'Travail d\'équipe', description: '' },
+    { name: 'Microsoft Office', description: '' },
+    { name: 'Français (Natif)', description: '' },
+    { name: 'Anglais (Professionnel)', description: '' },
+  ],
+};

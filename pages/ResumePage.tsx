@@ -4,10 +4,76 @@ import { useAutonomyJourney } from '../hooks/useAutonomyJourney';
 import { ResumeData, ResumeTemplate, Skill, ProfessionalExperience } from '../types';
 import { parseResumeText, getResumeSuggestions } from '../services/geminiService';
 import { detectSkillsFromText } from '../services/skillsService';
-import { PREFILLED_RESUME_EXAMPLE } from '../constants';
+import { PREFILLED_RESUME_EXAMPLE, PREFILLED_RESUME_DATA } from '../constants';
 import Button from '../components/Button';
 import Card from '../components/Card';
-import { ArrowPathIcon, EnvelopeIcon, PhoneIcon, MapPinIcon } from '../components/Icons';
+import { ArrowPathIcon, EnvelopeIcon, PhoneIcon, MapPinIcon, DragHandleIcon } from '../components/Icons';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+
+const SortableExperienceItem: React.FC<{
+  exp: ProfessionalExperience;
+  index: number;
+  handleOpenEditModal: (index: number) => void;
+  handleDeleteExperience: (index: number) => void;
+  handleGetSuggestions: (description: string, index: number) => void;
+  applySuggestion: (suggestion: string, index: number) => void;
+  suggestions: { [key: number]: { isLoading: boolean, list: string[] } };
+}> = ({ exp, index, handleOpenEditModal, handleDeleteExperience, handleGetSuggestions, applySuggestion, suggestions }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id: exp.title + index }); // Use a more stable ID if possible
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="p-3 border rounded-md dark:border-slate-700 bg-white dark:bg-slate-800 space-y-3 touch-none">
+        <div className="flex items-start gap-2">
+            <div {...attributes} {...listeners} className="cursor-grab py-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                <DragHandleIcon className="h-5 w-5" />
+            </div>
+            <div className="flex-grow">
+                <h3 className="font-semibold">{exp.title} <span className="font-normal text-slate-500 dark:text-slate-400">chez {exp.company}</span></h3>
+                <p className="text-sm mt-1">{exp.description}</p>
+            </div>
+        </div>
+        
+        <div className="flex justify-between items-center border-t dark:border-slate-600 pt-3 ml-8">
+            <div className="flex gap-2">
+                <Button onClick={() => handleOpenEditModal(index)} variant="secondary" className="!py-1 !px-2 text-xs">Modifier</Button>
+                <Button onClick={() => handleDeleteExperience(index)} variant="danger" className="!py-1 !px-2 text-xs">Supprimer</Button>
+            </div>
+            <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500 dark:text-slate-400 hidden sm:inline">Suggestions IA</span>
+                <Button onClick={() => handleGetSuggestions(exp.description, index)} isLoading={suggestions[index]?.isLoading} className="!p-2" aria-label="Get suggestions">
+                    <ArrowPathIcon className="h-4 w-4" />
+                </Button>
+            </div>
+        </div>
+        
+        {suggestions[index]?.list && suggestions[index].list.length > 0 && (
+            <div className="mt-2 space-y-2 text-sm ml-8">
+                <h4 className="font-semibold">Suggestions :</h4>
+                <ul className="list-disc list-inside">
+                    {suggestions[index].list.map((s, i) => (
+                        <li key={i} className="text-blue-600 dark:text-blue-400 cursor-pointer hover:underline" onClick={() => applySuggestion(s, index)}>{s}</li>
+                    ))}
+                </ul>
+            </div>
+        )}
+    </div>
+  );
+};
+
 
 // Sub-components for resume templates, defined outside the main component
 const MinimalistTemplate: React.FC<{ data: ResumeData }> = ({ data }) => (
@@ -198,6 +264,13 @@ const ResumePage: React.FC = () => {
   const resumePreviewRef = useRef<HTMLDivElement>(null);
   const [editingExperience, setEditingExperience] = useState<{index: number, data: ProfessionalExperience} | null>(null);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   // Debounce effect for skills detection
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -280,6 +353,11 @@ const ResumePage: React.FC = () => {
     }
   };
 
+  const handleLoadTemplate = () => {
+    if (window.confirm("Ceci remplacera toutes les données actuelles de votre CV par un modèle pré-rempli. Voulez-vous continuer ?")) {
+      setResumeData(PREFILLED_RESUME_DATA);
+    }
+  };
 
   const handleSkillToggle = (skill: Skill, isSelected: boolean) => {
     if (isSelected) {
@@ -362,15 +440,33 @@ const ResumePage: React.FC = () => {
     setEditingExperience({ index, data: { ...resumeData.experiences[index] } });
   };
 
+  const handleAddNewExperience = () => {
+    setEditingExperience({
+      index: -1, // Use -1 to signify a new experience
+      data: { title: '', company: '', startDate: '', endDate: '', description: '' }
+    });
+  };
+
   const handleCloseEditModal = () => {
     setEditingExperience(null);
   };
 
   const handleSaveExperience = () => {
     if (!editingExperience) return;
-    const newExperiences = [...resumeData.experiences];
-    newExperiences[editingExperience.index] = editingExperience.data;
-    setResumeData({ ...resumeData, experiences: newExperiences });
+
+    if (editingExperience.index === -1) {
+      // Adding a new experience
+      setResumeData({
+        ...resumeData,
+        experiences: [...resumeData.experiences, editingExperience.data]
+      });
+    } else {
+      // Updating an existing experience
+      const newExperiences = [...resumeData.experiences];
+      newExperiences[editingExperience.index] = editingExperience.data;
+      setResumeData({ ...resumeData, experiences: newExperiences });
+    }
+    
     setEditingExperience(null);
   };
 
@@ -392,6 +488,23 @@ const ResumePage: React.FC = () => {
       setResumeData({ ...resumeData, experiences: newExperiences });
     }
   };
+  
+  const handleDragEnd = (event: { active: any; over: any; }) => {
+    const {active, over} = event;
+
+    if (active.id !== over.id) {
+      // FIX: The custom `setResumeData` hook from `useAutonomyJourney` does not support
+      // a functional update form like `(prevState) => newState`. The new state object
+      // must be constructed explicitly using `resumeData` from the hook and passed directly.
+      const oldIndex = resumeData.experiences.findIndex((exp, i) => (exp.title + i) === active.id);
+      const newIndex = resumeData.experiences.findIndex((exp, i) => (exp.title + i) === over.id);
+      
+      setResumeData({
+          ...resumeData,
+          experiences: arrayMove(resumeData.experiences, oldIndex, newIndex)
+      });
+    }
+  }
 
   const renderTemplate = () => {
     switch (template) {
@@ -480,6 +593,7 @@ const ResumePage: React.FC = () => {
           ></textarea>
           <div className="mt-4 flex flex-wrap gap-2">
             <Button onClick={() => setConversationalText(PREFILLED_RESUME_EXAMPLE)} variant="secondary">Remplir avec un exemple</Button>
+            <Button onClick={handleLoadTemplate} variant="secondary">Charger un modèle de CV</Button>
           </div>
         </Card>
         
@@ -539,44 +653,40 @@ const ResumePage: React.FC = () => {
           </Card>
         )}
         
-        {resumeData.experiences.length > 0 && (
-          <Card>
+        <Card>
             <h2 className="text-xl font-bold mb-4">5. Gère tes expériences</h2>
-             <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">Modifie, supprime ou améliore tes descriptions avec l'IA.</p>
-            {resumeData.experiences.map((exp, index) => (
-                <div key={index} className="mb-4 p-3 border rounded-md dark:border-slate-700 space-y-3">
-                    <div>
-                        <h3 className="font-semibold">{exp.title} <span className="font-normal text-slate-500 dark:text-slate-400">chez {exp.company}</span></h3>
-                        <p className="text-sm mt-1">{exp.description}</p>
+            <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">Glisse-dépose pour réorganiser, puis ajoute, modifie ou supprime tes expériences.</p>
+            <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+            >
+                <SortableContext
+                    items={resumeData.experiences.map((exp, i) => exp.title + i)}
+                    strategy={verticalListSortingStrategy}
+                >
+                    <div className="space-y-4">
+                        {resumeData.experiences.map((exp, index) => (
+                            <SortableExperienceItem
+                                key={exp.title + index}
+                                exp={exp}
+                                index={index}
+                                handleOpenEditModal={handleOpenEditModal}
+                                handleDeleteExperience={handleDeleteExperience}
+                                handleGetSuggestions={handleGetSuggestions}
+                                applySuggestion={applySuggestion}
+                                suggestions={suggestions}
+                            />
+                        ))}
                     </div>
-
-                    <div className="flex justify-between items-center border-t dark:border-slate-600 pt-3">
-                        <div className="flex gap-2">
-                            <Button onClick={() => handleOpenEditModal(index)} variant="secondary" className="!py-1 !px-2 text-xs">Modifier</Button>
-                            <Button onClick={() => handleDeleteExperience(index)} variant="danger" className="!py-1 !px-2 text-xs">Supprimer</Button>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs text-slate-500 dark:text-slate-400 hidden sm:inline">Suggestions IA</span>
-                             <Button onClick={() => handleGetSuggestions(exp.description, index)} isLoading={suggestions[index]?.isLoading} className="!p-2" aria-label="Get suggestions">
-                               <ArrowPathIcon className="h-4 w-4" />
-                             </Button>
-                        </div>
-                    </div>
-                    
-                    {suggestions[index]?.list && suggestions[index].list.length > 0 && (
-                        <div className="mt-2 space-y-2 text-sm">
-                            <h4 className="font-semibold">Suggestions :</h4>
-                            <ul className="list-disc list-inside">
-                                {suggestions[index].list.map((s, i) => (
-                                    <li key={i} className="text-blue-600 dark:text-blue-400 cursor-pointer hover:underline" onClick={() => applySuggestion(s, index)}>{s}</li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-                </div>
-            ))}
-          </Card>
-        )}
+                </SortableContext>
+            </DndContext>
+            <div className="mt-4">
+                <Button onClick={handleAddNewExperience} variant="secondary" className="w-full">
+                  Ajouter une expérience
+                </Button>
+            </div>
+        </Card>
       </div>
 
       {/* Preview Column */}
@@ -597,7 +707,7 @@ const ResumePage: React.FC = () => {
       {editingExperience && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" aria-modal="true" role="dialog">
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg max-h-full overflow-y-auto">
-                <h2 className="text-2xl font-bold mb-4">Modifier l'expérience</h2>
+                <h2 className="text-2xl font-bold mb-4">{editingExperience.index === -1 ? "Ajouter une expérience" : "Modifier l'expérience"}</h2>
                 <div className="space-y-4">
                     <div>
                         <label htmlFor="title" className="block text-sm font-medium text-slate-700 dark:text-slate-200">Titre du poste</label>
@@ -632,7 +742,7 @@ const ResumePage: React.FC = () => {
     {isExportingPdf && (
       <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4" aria-modal="true" role="status">
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-8 flex items-center gap-6">
-              <svg className="animate-spin h-10 w-10 text-primary-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin h-10 w-10 text-primary-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="http://www.w3.org/2000/svg">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
