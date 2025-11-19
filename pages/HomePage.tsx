@@ -1,53 +1,16 @@
-import React, { useMemo } from 'react';
+
+import React from 'react';
 import { useAutonomyJourney } from '../hooks/useAutonomyJourney';
 import { Link } from 'react-router-dom';
 import Card from '../components/Card';
 import { CheckCircleIcon, XCircleIcon } from '../components/Icons';
 import Button from '../components/Button';
+import TrouveTonCJE from '../components/TrouveTonCJE';
 
 const HomePage: React.FC = () => {
-  const { isResumeComplete, isBudgetComplete, resumeData, budgetData, resetData } = useAutonomyJourney();
+  const { isResumeComplete, isBudgetComplete, isRiasecComplete, resumeData, riasecResult } = useAutonomyJourney();
 
-  const totalExpenses = useMemo(() => {
-    // FIX: The original reduce function had type inference issues.
-    // Replaced with a standard loop for robust type safety.
-    let currentTotal = 0;
-    for (const category of Object.values(budgetData.expenses)) {
-      if (typeof category === 'number') {
-        currentTotal += category;
-      } else if (category && typeof category === 'object') {
-        for (const value of Object.values(category)) {
-          currentTotal += Number(value);
-        }
-      }
-    }
-    return currentTotal;
-  }, [budgetData.expenses]);
-
-  const gap = budgetData.income - totalExpenses;
   const skillsCount = resumeData.skills.length;
-
-  const getGapMessage = () => {
-    if (!isBudgetComplete) return 'Planifie ton budget pour voir le résultat.';
-    if (gap >= 0) {
-      return (
-        <span className="text-green-500">
-          Excellent ! Tu as un surplus de {gap.toFixed(2)} $ par mois.
-        </span>
-      );
-    }
-    return (
-      <span className="text-red-500">
-        Attention, il te manque {Math.abs(gap).toFixed(2)} $ par mois.
-      </span>
-    );
-  };
-  
-  const handleReset = () => {
-    if (window.confirm("Es-tu sûr de vouloir recommencer à zéro ? Toutes tes données seront effacées.")) {
-      resetData();
-    }
-  }
 
   return (
     <div className="space-y-8">
@@ -56,86 +19,118 @@ const HomePage: React.FC = () => {
           Bienvenue dans ton <span className="text-primary-600 dark:text-primary-400">Parcours vers l'Autonomie</span>
         </h1>
         <p className="mt-4 text-lg text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
-          Ces outils sont conçus pour t'aider à préparer ton avenir professionnel et financier. Commençons !
+          Ces outils sont conçus pour t'aider à préparer ton avenir professionnel et financier avec l'aide de ton Carrefour Jeunesse-Emploi.
         </p>
       </div>
-
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-1">
+      
+      {/* Main Dashboard Grid */}
+      <div className="grid md:grid-cols-2 gap-6 items-stretch">
+        
+        {/* Column 1: Progression */}
+        <Card className="h-full flex flex-col">
           <h2 className="text-xl font-bold mb-4">Ta Progression</h2>
-          <ul className="space-y-3">
-            <li className="flex items-center">
+          <ul className="space-y-4 flex-grow">
+            <li className="flex items-center p-2 rounded hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
               {isResumeComplete ? (
-                <CheckCircleIcon className="w-6 h-6 text-green-500 mr-3" />
+                <CheckCircleIcon className="w-6 h-6 text-green-500 mr-3 shrink-0" />
               ) : (
-                <XCircleIcon className="w-6 h-6 text-red-500 mr-3" />
+                <XCircleIcon className="w-6 h-6 text-red-500 mr-3 shrink-0" />
               )}
-              <span>CV créé</span>
+              <span className="font-medium">CV créé</span>
             </li>
-             <li className="flex items-center">
+             <li className="flex items-center p-2 rounded hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
               {skillsCount > 0 ? (
-                <CheckCircleIcon className="w-6 h-6 text-green-500 mr-3" />
+                <CheckCircleIcon className="w-6 h-6 text-green-500 mr-3 shrink-0" />
               ) : (
-                <XCircleIcon className="w-6 h-6 text-red-500 mr-3" />
+                <XCircleIcon className="w-6 h-6 text-red-500 mr-3 shrink-0" />
               )}
-              <span>{skillsCount} compétences identifiées</span>
+              <span className="font-medium">{skillsCount} compétences identifiées</span>
             </li>
-            <li className="flex items-center">
+            <li className="flex items-center p-2 rounded hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
               {isBudgetComplete ? (
-                <CheckCircleIcon className="w-6 h-6 text-green-500 mr-3" />
+                <CheckCircleIcon className="w-6 h-6 text-green-500 mr-3 shrink-0" />
               ) : (
-                <XCircleIcon className="w-6 h-6 text-red-500 mr-3" />
+                <XCircleIcon className="w-6 h-6 text-red-500 mr-3 shrink-0" />
               )}
-              <span>Budget planifié</span>
+              <span className="font-medium">Budget planifié</span>
+            </li>
+            <li className="flex items-center p-2 rounded hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+              {isRiasecComplete ? (
+                <CheckCircleIcon className="w-6 h-6 text-green-500 mr-3 shrink-0" />
+              ) : (
+                <XCircleIcon className="w-6 h-6 text-red-500 mr-3 shrink-0" />
+              )}
+              <span className="font-medium">
+                {isRiasecComplete && riasecResult 
+                  ? `Profil RIASEC (${riasecResult.profil_riasec_principal.lettres_dominantes.join('-')})`
+                  : "Profil RIASEC établi"}
+              </span>
             </li>
           </ul>
         </Card>
 
-        <Card className="lg:col-span-2">
-          <h2 className="text-xl font-bold mb-4">Analyse du Budget</h2>
-          <p className="text-slate-600 dark:text-slate-300">{getGapMessage()}</p>
-          {isBudgetComplete && gap < 0 && (
-            <div className="mt-4 p-4 bg-amber-100 dark:bg-amber-900/50 rounded-lg border border-amber-300 dark:border-amber-700">
-              <h3 className="font-semibold text-amber-800 dark:text-amber-200">Conseil intelligent</h3>
-              <p className="text-amber-700 dark:text-amber-300">
-                Ton budget est serré. Améliorer ton CV en y ajoutant plus de compétences pourrait t'aider à trouver un emploi mieux rémunéré.
-              </p>
-              <Link to="/cv">
-                <Button variant="primary" className="mt-2">
-                  Améliorer mon CV
-                </Button>
-              </Link>
-            </div>
-          )}
-        </Card>
+        {/* Column 2: Trouve Ton CJE */}
+        <div className="h-full min-h-[300px]">
+           <TrouveTonCJE className="h-full" />
+        </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card>
-          <h2 className="text-2xl font-bold mb-3">Générateur de CV Intelligent</h2>
-          <p className="text-slate-600 dark:text-slate-300 mb-4">
+      {/* Feature Cards */}
+      <div className="grid md:grid-cols-3 gap-6">
+        {/* Orientation Card with Result Display */}
+        <Card className="hover:shadow-md transition-shadow flex flex-col">
+          <h2 className="text-2xl font-bold mb-3 text-indigo-600 dark:text-indigo-400">Test RIASEC</h2>
+          {isRiasecComplete && riasecResult ? (
+             <div className="flex-grow flex flex-col">
+                 <div className="flex items-center gap-2 mb-3">
+                    {riasecResult.profil_riasec_principal.lettres_dominantes.map(l => (
+                        <span key={l} className="font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300 px-2 py-1 rounded text-sm shadow-sm">{l}</span>
+                    ))}
+                 </div>
+                 <h3 className="font-bold text-lg mb-1 leading-tight">{riasecResult.titre_profil}</h3>
+                 <p className="text-slate-600 dark:text-slate-300 text-sm mb-4 line-clamp-3">
+                    {riasecResult.profil_riasec_principal.description_courte}
+                 </p>
+                 <Link to="/orientation" className="mt-auto">
+                    <Button variant="primary" className="w-full bg-indigo-600 hover:bg-indigo-700">
+                      Voir mon profil complet
+                    </Button>
+                 </Link>
+             </div>
+          ) : (
+             <>
+                <p className="text-slate-600 dark:text-slate-300 mb-6 flex-grow">
+                    Tu ne sais pas quoi faire plus tard ? Découvre tes intérêts dominants et obtiens des pistes de métiers.
+                </p>
+                <Link to="/orientation" className="mt-auto">
+                    <Button variant="primary" className="w-full bg-indigo-600 hover:bg-indigo-700">
+                    Faire le test
+                    </Button>
+                </Link>
+             </>
+          )}
+        </Card>
+
+        <Card className="hover:shadow-md transition-shadow flex flex-col">
+          <h2 className="text-2xl font-bold mb-3 text-primary-600 dark:text-primary-400">Générateur de CV</h2>
+          <p className="text-slate-600 dark:text-slate-300 mb-6 flex-grow">
             Raconte ton parcours, et notre IA détectera tes compétences pour créer un CV professionnel.
           </p>
-          <Link to="/cv">
-            <Button variant="primary">Commencer mon CV</Button>
+          <Link to="/cv" className="mt-auto">
+            <Button variant="primary" className="w-full">Créer mon CV</Button>
           </Link>
         </Card>
-        <Card>
-          <h2 className="text-2xl font-bold mb-3">Simulateur de Budget</h2>
-          <p className="text-slate-600 dark:text-slate-300 mb-4">
-            Planifie les dépenses de ton premier appartement pour t'assurer d'avoir un budget équilibré et réaliste.
+
+        <Card className="hover:shadow-md transition-shadow flex flex-col">
+          <h2 className="text-2xl font-bold mb-3 text-green-600 dark:text-green-400">Simulateur de Budget</h2>
+          <p className="text-slate-600 dark:text-slate-300 mb-6 flex-grow">
+            Planifie les dépenses de ton premier appartement pour t'assurer d'avoir un budget équilibré.
           </p>
-          <Link to="/budget">
-            <Button variant="primary">Planifier mon Budget</Button>
+          <Link to="/budget" className="mt-auto">
+            <Button variant="primary" className="w-full">Planifier mon Budget</Button>
           </Link>
         </Card>
       </div>
-      
-      <Card className="text-center">
-        <h2 className="text-xl font-bold mb-4">Recommencer?</h2>
-        <p className="text-slate-600 dark:text-slate-300 mb-4">Si tu veux repartir à zéro, tu peux effacer toutes tes données ici.</p>
-        <Button variant="danger" onClick={handleReset}>Réinitialiser mon parcours</Button>
-      </Card>
     </div>
   );
 };

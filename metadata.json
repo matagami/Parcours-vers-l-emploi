@@ -1,5 +1,7 @@
 {
   "name": "Mon parcours vers l'autonomie",
   "description": "Une application web complète pour t'aider à créer ton CV intelligent et simuler ton budget pour ton premier appartement, conçue pour les jeunes du Carrefour Jeunesse-Emploi.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "geolocation"
+  ]
 }

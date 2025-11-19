@@ -1,9 +1,12 @@
+
 import React, { useMemo, useState } from 'react';
 import { useAutonomyJourney } from '../hooks/useAutonomyJourney';
 import { BudgetData } from '../types';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import PieChart from '../components/PieChart';
+import { getBudgetAnalysis } from '../services/geminiService';
+import { SparklesIcon } from '../components/Icons';
 
 // Gauge component defined inside to avoid extra file, but outside main component
 interface GaugeProps {
@@ -47,7 +50,7 @@ const NumberInput: React.FC<NumberInputProps> = ({ label, value, onChange }) => 
       </div>
       <input
         type="number"
-        className="w-full pl-7 pr-2 py-2 border border-slate-300 rounded-md focus:ring-primary-500 focus:border-primary-500 dark:bg-slate-700 dark:border-slate-600"
+        className="w-full pl-7 pr-2 py-2 border border-slate-300 rounded-md focus:ring-primary-500 focus:border-primary-500 bg-slate-100 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
         value={value || ''}
         onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
         placeholder="0.00"
@@ -59,6 +62,8 @@ const NumberInput: React.FC<NumberInputProps> = ({ label, value, onChange }) => 
 const BudgetPage: React.FC = () => {
   const { budgetData, setBudgetData } = useAutonomyJourney();
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<string | null>(null);
 
   // FIX: Corrected the generic handler to be type-safe for nested objects.
   // This resolves errors from incorrect type constraints on generics and value types.
@@ -151,6 +156,22 @@ const BudgetPage: React.FC = () => {
         }
     }
   };
+  
+  const handleAnalyzeBudget = async () => {
+    if (budgetData.income <= 0) {
+        alert("Entre ton revenu d'abord pour obtenir une analyse pertinente.");
+        return;
+    }
+    setIsAnalyzing(true);
+    try {
+        const result = await getBudgetAnalysis(budgetData);
+        setAnalysisResult(result);
+    } catch (error) {
+        alert("Erreur lors de l'analyse.");
+    } finally {
+        setIsAnalyzing(false);
+    }
+  };
 
   return (
     <div className="grid lg:grid-cols-3 gap-8">
@@ -225,7 +246,18 @@ const BudgetPage: React.FC = () => {
             <p className="text-sm">Salaire annuel brut requis (estimé):</p>
             <p className="font-bold text-xl text-primary-600 dark:text-primary-400">{totals.grossAnnualRequired.toLocaleString('fr-CA', { style: 'currency', currency: 'CAD' })}</p>
           </div>
-          <Button onClick={exportToPdf} className="w-full mt-4" isLoading={isExportingPdf}>Exporter en PDF</Button>
+          
+          <div className="mt-4 space-y-2">
+            <Button 
+                onClick={handleAnalyzeBudget} 
+                className="w-full bg-violet-600 hover:bg-violet-700 text-white" 
+                isLoading={isAnalyzing}
+            >
+                <SparklesIcon className="w-4 h-4 mr-2" />
+                Analyser avec l'IA
+            </Button>
+            <Button onClick={exportToPdf} className="w-full" isLoading={isExportingPdf} variant="secondary">Exporter en PDF</Button>
+          </div>
         </Card>
         
         <Card>
@@ -243,17 +275,43 @@ const BudgetPage: React.FC = () => {
             </div>
         </Card>
       </div>
+      
       {isExportingPdf && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4" aria-modal="true" role="status">
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-8 flex items-center gap-6">
-              <svg className="animate-spin h-10 w-10 text-primary-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <span className="text-xl font-semibold">Génération du PDF...</span>
-          </div>
-      </div>
-    )}
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4" aria-modal="true" role="status">
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-8 flex items-center gap-6">
+                <svg className="animate-spin h-10 w-10 text-primary-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span className="text-xl font-semibold">Génération du PDF...</span>
+            </div>
+        </div>
+      )}
+
+      {analysisResult && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg relative max-h-[90vh] overflow-y-auto">
+                <button 
+                    onClick={() => setAnalysisResult(null)}
+                    className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                </button>
+                <h2 className="text-2xl font-bold mb-4 flex items-center text-violet-600 dark:text-violet-400">
+                    <SparklesIcon className="w-6 h-6 mr-2" />
+                    Analyse de ton Budget
+                </h2>
+                <div className="prose dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                    {analysisResult}
+                </div>
+                <div className="mt-6 flex justify-end">
+                    <Button onClick={() => setAnalysisResult(null)}>Fermer</Button>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 };

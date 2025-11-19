@@ -1,11 +1,12 @@
 
-import { ResumeData, BudgetData } from '../types';
+import { ResumeData, BudgetData, RiasecOutput } from '../types';
 
 const JOURNEY_DATA_KEY = 'autonomyJourneyData';
 
 interface JourneyData {
   resumeData: ResumeData;
   budgetData: BudgetData;
+  riasecResult?: RiasecOutput | null;
   theme: 'light' | 'dark';
 }
 

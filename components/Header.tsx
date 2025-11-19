@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAutonomyJourney } from '../hooks/useAutonomyJourney';
@@ -24,11 +25,17 @@ const Header: React.FC = () => {
             <NavLink to="/" className={navLinkClass}>
               Tableau de bord
             </NavLink>
+            <NavLink to="/orientation" className={navLinkClass}>
+              Test RIASEC
+            </NavLink>
             <NavLink to="/cv" className={navLinkClass}>
               Mon CV
             </NavLink>
             <NavLink to="/budget" className={navLinkClass}>
               Mon Budget
+            </NavLink>
+            <NavLink to="/cje" className={navLinkClass}>
+              Trouve ton CJE
             </NavLink>
             <button
               onClick={toggleTheme}

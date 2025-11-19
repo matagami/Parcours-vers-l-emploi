@@ -1,10 +1,13 @@
-import { ResumeData, BudgetData, ResumeTemplate } from './types';
+
+import { ResumeData, BudgetData, ResumeTemplate, CJE } from './types';
 
 export const INITIAL_RESUME_DATA: ResumeData = {
   personalInfo: { name: '', email: '', phone: '', address: '' },
   experiences: [],
   education: [],
   skills: [],
+  projects: [],
+  certifications: [],
 };
 
 export const INITIAL_BUDGET_DATA: BudgetData = {
@@ -30,6 +33,8 @@ Avant ça, de 2018 à 2019, j'étais vendeur dans un magasin de vêtements. Je c
 J'ai un DEC en Techniques de l'informatique du Cégep du Vieux Montréal, terminé en 2018.
 
 Mes compétences manuelles sont : Service à la clientèle, gestion du temps, Microsoft Office, et je parle français et anglais.
+
+J'ai réalisé un projet personnel de site web pour un organisme local et j'ai mon certificat de secourisme.
 `;
 
 export const PREFILLED_RESUME_DATA: ResumeData = {
@@ -72,4 +77,90 @@ export const PREFILLED_RESUME_DATA: ResumeData = {
     { name: 'Français (Natif)', description: '' },
     { name: 'Anglais (Professionnel)', description: '' },
   ],
+  projects: [
+    {
+        title: "Site Web Communautaire",
+        description: "Conception et développement d'un site web vitrine pour un organisme sans but lucratif local."
+    }
+  ],
+  certifications: [
+    {
+        name: "Secourisme général et RCR",
+        issuer: "Croix-Rouge canadienne",
+        date: "2023"
+    }
+  ]
 };
+
+export const CJES_DATA: CJE[] = [
+  {
+    id: "cje-montreal-centre-ville",
+    nom: "CJE Montréal Centre-Ville",
+    ville: "Montréal",
+    adresse: "1410 Rue Guy, Montréal, QC",
+    siteWeb: "https://www.cjemontreal.org/",
+    latitude: 45.4957,
+    longitude: -73.5780,
+    telephone: "514-875-9770"
+  },
+  {
+    id: "cje-jamesie",
+    nom: "CJE de la Jamésie",
+    ville: "Chibougamau",
+    adresse: "466, 3e Rue, Chibougamau, QC",
+    siteWeb: "https://www.trouvetoncje.com",
+    latitude: 49.9167,
+    longitude: -74.3667,
+    telephone: "418-748-7643"
+  },
+  {
+    id: "cje-capitale-nationale",
+    nom: "CJE de la Capitale-Nationale",
+    ville: "Québec",
+    adresse: "200-160, rue Saint-Joseph Est, Québec, QC",
+    siteWeb: "https://www.cjecn.qc.ca/",
+    latitude: 46.8131,
+    longitude: -71.2224,
+    telephone: "418-524-2345"
+  },
+  {
+    id: "cje-sherbrooke",
+    nom: "CJE de Sherbrooke",
+    ville: "Sherbrooke",
+    adresse: "155, rue Wellington Sud, Sherbrooke, QC",
+    siteWeb: "https://www.cjesherbrooke.qc.ca/",
+    latitude: 45.4001,
+    longitude: -71.8991,
+    telephone: "819-565-2722"
+  },
+  {
+    id: "cje-trois-rivieres",
+    nom: "CJE Trois-Rivières/MRC des Chenaux",
+    ville: "Trois-Rivières",
+    adresse: "100, rue Laviolette, Trois-Rivières, QC",
+    siteWeb: "https://cjetr.org/",
+    latitude: 46.3430,
+    longitude: -72.5421,
+    telephone: "819-379-3377"
+  },
+  {
+    id: "cje-gatineau",
+    nom: "CJE de l'Outaouais",
+    ville: "Gatineau",
+    adresse: "430, boulevard de l'Hôpital, Gatineau, QC",
+    siteWeb: "https://cjeo.qc.ca/",
+    latitude: 45.4776,
+    longitude: -75.6950,
+    telephone: "819-561-7712"
+  },
+  {
+    id: "cje-saguenay",
+    nom: "CJE Chicoutimi",
+    ville: "Chicoutimi",
+    adresse: "436, rue Racine Est, Chicoutimi, QC",
+    siteWeb: "https://cje-chicoutimi.org/",
+    latitude: 48.4276,
+    longitude: -71.0600,
+    telephone: "418-545-9710"
+  }
+];
