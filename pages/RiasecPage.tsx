@@ -31,7 +31,7 @@ const RAW_QUESTIONS = [
     { id: 'A2', type: 'A', text: "J'aime les activités artistiques (musique, écriture, dessin, théâtre)." },
     { id: 'A3', type: 'A', text: "Je suis expressif et j'aime sortir des sentiers battus." },
     { id: 'A4', type: 'A', text: "Je m'intéresse à la photographie, au montage vidéo ou au design graphique." },
-    { id: 'A5', type: 'A', text: "J'ai un intérêt pour la mode, la décoration ou l'architecture." },
+    { id: 'A5', type: 'A', text: "J'ai un intérêt pour la mode, la décoration ou'architecture." },
     { id: 'A6', type: 'A', text: "J'aime écrire des histoires, des poèmes ou des articles de blogue." },
 
     // Social (S)
@@ -364,18 +364,29 @@ const RiasecPage: React.FC = () => {
                                                 <div 
                                                     key={idx}
                                                     onClick={() => handleToggleAnswer(qText, dim.code)}
-                                                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 flex items-start gap-3 h-full ${
+                                                    className={`group relative p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 flex items-start gap-3 select-none ${
                                                         isSelected
-                                                        ? `border-primary-500 bg-primary-50 dark:bg-primary-900/20 shadow-inner transform scale-[0.98]` 
-                                                        : 'border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 hover:border-primary-200 dark:hover:border-primary-700 hover:bg-white dark:hover:bg-slate-700'
+                                                        ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 shadow-md ring-1 ring-indigo-600 ring-opacity-50 z-10'
+                                                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-sm'
                                                     }`}
                                                 >
-                                                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
-                                                        isSelected ? 'bg-primary-600 border-primary-600' : 'border-slate-300 bg-white dark:bg-slate-600'
+                                                    {/* Checkbox Indicator */}
+                                                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all duration-300 ${
+                                                        isSelected
+                                                        ? 'bg-indigo-600 border-indigo-600 scale-110'
+                                                        : 'border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 group-hover:border-indigo-400'
                                                     }`}>
-                                                        {isSelected && <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                                                        <svg className={`w-3.5 h-3.5 text-white transition-transform duration-300 ${isSelected ? 'scale-100' : 'scale-0'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                        </svg>
                                                     </div>
-                                                    <span className={`text-sm font-medium leading-snug ${isSelected ? 'text-primary-900 dark:text-primary-100' : 'text-slate-700 dark:text-slate-300'}`}>
+
+                                                    {/* Text */}
+                                                    <span className={`text-sm font-medium leading-snug transition-colors duration-200 ${
+                                                        isSelected
+                                                        ? 'text-indigo-900 dark:text-indigo-100'
+                                                        : 'text-slate-700 dark:text-slate-300'
+                                                    }`}>
                                                         {qText}
                                                     </span>
                                                 </div>

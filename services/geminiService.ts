@@ -967,8 +967,7 @@ export const getDashboardContent = async (context: any): Promise<DashboardConten
     Générer le contenu du tableau de bord pour guider l'utilisateur vers la prochaine étape logique.
     1. Adapte le titre et le texte de bienvenue.
     2. Sélectionne et ordonne les cartes pertinentes.
-    3. RÈGLE ABSOLUE: Ne JAMAIS générer de cartes pour inviter à utiliser les outils de base (passer le test RIASEC, faire son CV, faire son budget, trouver un CJE). Ces outils sont fixes dans l'interface en bas.
-    4. Génère UNIQUEMENT des cartes de "Résultats" ou de "Suivi" si les données existent dans le contexte :
+    3. RÈGLE ABSOLUE: Ne JAMAIS générer de cartes d'invitation ou de découverte pour les outils (RIASEC, CV, Budget, CJE). Ces outils sont fixes en bas. Si le test RIASEC n'est pas fait, NE GÉNÈRE RIEN à ce sujet dans le tableau de bord. Génère UNIQUEMENT des cartes de RÉSULTATS si les données existent :
        - id: 'resultats_riasec' (seulement si context.etat.test_riasec_passe est vrai).
        - id: 'plan_action' (seulement si context.etat.plan_action_genere est vrai).
     5. Si aucune donnée de résultat n'est disponible (test pas passé, pas de plan), retourne un tableau 'dashboard_cards' VIDE.

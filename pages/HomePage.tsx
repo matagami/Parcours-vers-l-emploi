@@ -163,23 +163,16 @@ const HomePage: React.FC = () => {
 
   // 2. On filtre proprement les cartes visibles
   // IMPORTANT: On filtre les cartes "génériques" (test_riasec, etc.) car elles sont déjà présentes dans les "Outils Rapides" en bas.
-  const redundantIds = [
-      'test_riasec', 
-      'cv_intelligent', 
-      'budget_sim', 
-      'trouve_cje', 
-      'invitation_riasec', 
-      'decouverte_riasec', 
-      'commencer_riasec', 
-      'intro_riasec',
-      'start_riasec'
-  ];
-  
   const visibleCards = cards.filter((card) => {
       if (card.visible === false) return false;
-      if (redundantIds.includes(card.id)) return false;
       
-      // Fallback filtering based on content keywords if ID is not in the list
+      const blockedIds = [
+        'test_riasec', 'cv_intelligent', 'budget_sim', 'trouve_cje', 
+        'invitation_riasec', 'decouverte_riasec', 'commencer_riasec', 'intro_riasec', 'start_riasec'
+      ];
+      if (blockedIds.includes(card.id)) return false;
+      
+      // Extra safety: Filter by title keywords for "Start" calls to action if generated ID varies
       const titleLower = card.titre.toLowerCase();
       if (
           (titleLower.includes('découvre') || titleLower.includes('commence')) && 
