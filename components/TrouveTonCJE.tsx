@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { MapPinIcon, ArrowPathIcon, GlobeAltIcon, XCircleIcon, SparklesIcon } from './Icons';
+import { MapPinIcon, ArrowPathIcon, GlobeAltIcon, XCircleIcon, SparklesIcon, ArrowLongRightIcon } from './Icons';
 import Button from './Button';
 import Card from './Card';
 import { CJE } from '../types';
@@ -10,6 +10,7 @@ import { findBestCJE } from '../services/geminiService';
 const TrouveTonCJE: React.FC<{className?: string}> = ({ className = '' }) => {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [nearestCJE, setNearestCJE] = useState<CJE | null>(null);
+  const [otherCJEs, setOtherCJEs] = useState<Array<{id: string, nom: string, ville: string, adresse: string}>>([]);
   const [distance, setDistance] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [reason, setReason] = useState<string>('');
@@ -17,6 +18,15 @@ const TrouveTonCJE: React.FC<{className?: string}> = ({ className = '' }) => {
   // Input state for text search
   const [city, setCity] = useState('');
   const [postalCode, setPostalCode] = useState('');
+
+  // UI Text state (can be dynamic from AI)
+  const [uiText, setUiText] = useState({
+    title: "Trouve ton CJE",
+    intro: "Entre ta ville ou ton code postal pour savoir quel CJE peut t’aider.",
+    labelCity: "Ta ville",
+    labelPostal: "Ton code postal",
+    btnSearch: "Rechercher"
+  });
 
   // Formule de Haversine pour calculer la distance en km
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -37,10 +47,11 @@ const TrouveTonCJE: React.FC<{className?: string}> = ({ className = '' }) => {
     setStatus('loading');
     setErrorMsg('');
     setReason('');
+    setOtherCJEs([]);
 
     if (!navigator.geolocation) {
       setStatus('error');
-      setErrorMsg("La géolocalisation n'est pas supportée par ton navigateur.");
+      setErrorMsg("Ton navigateur ne supporte pas la géolocalisation. Utilise la recherche manuelle.");
       return;
     }
 
@@ -52,6 +63,7 @@ const TrouveTonCJE: React.FC<{className?: string}> = ({ className = '' }) => {
         let minDistance = Infinity;
         let closest: CJE | null = null;
 
+        // Simple nearest logic for geo (doesn't use AI for top 3 in this mode for simplicity)
         CJES_DATA.forEach((cje) => {
           const dist = calculateDistance(userLat, userLon, cje.latitude, cje.longitude);
           if (dist < minDistance) {
@@ -67,23 +79,23 @@ const TrouveTonCJE: React.FC<{className?: string}> = ({ className = '' }) => {
           setReason("Ce CJE est le plus proche de ta position actuelle.");
         } else {
           setStatus('error');
-          setErrorMsg("Impossible de trouver un CJE proche.");
+          setErrorMsg("Aucun CJE trouvé à proximité. Essaie la recherche par ville.");
         }
       },
       (error) => {
         setStatus('error');
         switch (error.code) {
           case error.PERMISSION_DENIED:
-            setErrorMsg("Tu as refusé l'accès à ta localisation.");
+            setErrorMsg("Tu as refusé la géolocalisation. Pas de problème ! Entre simplement ta ville ou ton code postal ci-dessus.");
             break;
           case error.POSITION_UNAVAILABLE:
-            setErrorMsg("Les informations de localisation sont indisponibles.");
+            setErrorMsg("Impossible de détecter ta position exacte. Essaie la recherche manuelle par ville ou code postal.");
             break;
           case error.TIMEOUT:
-            setErrorMsg("La demande de localisation a expiré.");
+            setErrorMsg("La localisation prend trop de temps. Utilise plutôt la recherche manuelle pour un résultat immédiat.");
             break;
           default:
-            setErrorMsg("Une erreur inconnue est survenue.");
+            setErrorMsg("Une erreur de localisation est survenue. La recherche manuelle reste le meilleur moyen de trouver ton CJE.");
         }
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -100,10 +112,22 @@ const TrouveTonCJE: React.FC<{className?: string}> = ({ className = '' }) => {
     setStatus('loading');
     setErrorMsg('');
     setDistance(null); // No precise distance with text search
+    setOtherCJEs([]);
 
     try {
         const result = await findBestCJE(city, postalCode);
         
+        // Update UI texts if provided by AI
+        if(result.page_ui) {
+             setUiText({
+                title: result.page_ui.page_title,
+                intro: result.page_ui.intro_text,
+                labelCity: result.page_ui.form.ville.label,
+                labelPostal: result.page_ui.form.code_postal.label,
+                btnSearch: result.page_ui.form.bouton_rechercher
+             });
+        }
+
         if (result.cje_plus_proche && result.cje_plus_proche.id) {
             // Hydrate with full data from constants to get lat/long if needed for map
             const fullCJEData = CJES_DATA.find(c => c.id === result.cje_plus_proche.id) || null;
@@ -112,13 +136,17 @@ const TrouveTonCJE: React.FC<{className?: string}> = ({ className = '' }) => {
                 setNearestCJE(fullCJEData);
                 setReason(result.cje_plus_proche.raison_selection || "Ce CJE correspond le mieux à ta recherche.");
                 setStatus('success');
+                
+                if (result.top_3_cjes) {
+                    setOtherCJEs(result.top_3_cjes);
+                }
             } else {
                  setStatus('error');
                  setErrorMsg("Erreur: CJE introuvable dans la base de données.");
             }
         } else {
             setStatus('error');
-            setErrorMsg(result.ui.messages.aucun_resultat || "Aucun CJE trouvé pour cette recherche.");
+            setErrorMsg(result.page_ui?.messages.aucun_resultat || "Aucun CJE trouvé pour cette recherche.");
         }
 
     } catch (error) {
@@ -127,50 +155,67 @@ const TrouveTonCJE: React.FC<{className?: string}> = ({ className = '' }) => {
     }
   };
 
+  const selectOtherCJE = (id: string) => {
+      const fullCJEData = CJES_DATA.find(c => c.id === id) || null;
+      if (fullCJEData) {
+          setNearestCJE(fullCJEData);
+          setReason("Sélectionné depuis la liste des suggestions.");
+          setDistance(null); 
+          // Scroll to top of card
+          const element = document.getElementById('cje-result-card');
+          if(element) element.scrollIntoView({ behavior: 'smooth' });
+      }
+  }
+
   const resetSearch = () => {
       setStatus('idle');
       setCity('');
       setPostalCode('');
+      setOtherCJEs([]);
   };
 
   return (
     <div className={`h-full ${className}`}>
       {status === 'idle' && (
-        <Card className="h-full flex flex-col justify-center p-6 border-blue-100 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 transition-all hover:shadow-md">
-          <div className="text-center mb-6">
-            <div className="bg-blue-100 dark:bg-blue-800 p-4 rounded-full mb-4 text-primary-600 dark:text-primary-400 inline-block">
-                <MapPinIcon className="w-8 h-8" />
+        <Card className="h-full flex flex-col p-6 border-blue-100 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+          
+          <div className="flex items-center gap-3 mb-6 border-b border-blue-200 dark:border-slate-700 pb-4">
+            <div className="bg-primary-600 p-2 rounded-lg text-white shadow-md">
+                <MapPinIcon className="w-6 h-6" />
             </div>
-            <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">
-                Trouve ton CJE
+            <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">
+                {uiText.title}
             </h2>
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-                Entre ta ville ou ton code postal pour savoir quel CJE peut t’aider.
-            </p>
           </div>
           
-          <div className="space-y-4 w-full max-w-xs mx-auto">
+          <p className="text-sm text-slate-600 dark:text-slate-300 mb-6 text-center">
+              {uiText.intro}
+          </p>
+          
+          <div className="space-y-4 w-full max-w-xs mx-auto mt-auto mb-auto">
             <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1 ml-1">{uiText.labelCity}</label>
                 <input 
                     type="text" 
-                    placeholder="Ta ville" 
+                    placeholder="ex: Montréal" 
                     className="w-full p-2 text-sm border border-slate-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 dark:bg-slate-800 dark:border-slate-700"
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
                 />
             </div>
             <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1 ml-1">{uiText.labelPostal}</label>
                 <input 
                     type="text" 
-                    placeholder="Ton code postal" 
+                    placeholder="ex: H2X 1Y2" 
                     className="w-full p-2 text-sm border border-slate-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 dark:bg-slate-800 dark:border-slate-700"
                     value={postalCode}
                     onChange={(e) => setPostalCode(e.target.value)}
                 />
             </div>
             
-            <Button onClick={handleTextSearch} className="w-full rounded-full shadow-lg shadow-blue-500/20">
-               Rechercher
+            <Button onClick={handleTextSearch} className="w-full rounded-full shadow-lg shadow-blue-500/20 hover:scale-105 transition-transform">
+               {uiText.btnSearch}
             </Button>
 
             <div className="relative py-2">
@@ -182,7 +227,7 @@ const TrouveTonCJE: React.FC<{className?: string}> = ({ className = '' }) => {
                 </div>
             </div>
             
-            <Button onClick={handleGeoSearch} variant="secondary" className="w-full rounded-full text-xs">
+            <Button onClick={handleGeoSearch} variant="secondary" className="w-full rounded-full text-xs hover:bg-white dark:hover:bg-slate-700 border border-transparent hover:border-slate-300 dark:hover:border-slate-600">
               <MapPinIcon className="w-3 h-3 mr-2" />
               Utiliser ma position
             </Button>
@@ -209,13 +254,13 @@ const TrouveTonCJE: React.FC<{className?: string}> = ({ className = '' }) => {
             </div>
             <h3 className="text-lg font-bold text-red-800 dark:text-red-200 mb-2">Oups !</h3>
             
-            <div className="flex items-center justify-center gap-2 mb-5 text-red-700 dark:text-red-300">
-                <XCircleIcon className="w-4 h-4 flex-shrink-0" />
+            <div className="flex items-center justify-center gap-2 mb-5 text-red-700 dark:text-red-300 bg-white dark:bg-slate-800 p-3 rounded-lg shadow-sm border border-red-100 dark:border-red-900/50 w-full">
+                <XCircleIcon className="w-5 h-5 flex-shrink-0" />
                 <p className="text-sm font-medium">{errorMsg}</p>
             </div>
 
             <Button onClick={resetSearch} variant="secondary" className="w-full mb-3">
-              Réessayer
+              Essayer la recherche manuelle
             </Button>
             <a 
                 href="https://www.trouvetoncje.com/" 
@@ -229,7 +274,7 @@ const TrouveTonCJE: React.FC<{className?: string}> = ({ className = '' }) => {
       )}
 
       {status === 'success' && nearestCJE && (
-        <Card className="h-full flex flex-col !p-0 overflow-hidden border-primary-200 dark:border-primary-800 relative ring-2 ring-primary-50 dark:ring-primary-900/20 shadow-lg">
+        <Card id="cje-result-card" className="h-full flex flex-col !p-0 overflow-hidden border-primary-200 dark:border-primary-800 relative ring-2 ring-primary-50 dark:ring-primary-900/20 shadow-lg">
              {/* Header Section */}
              <div className="flex-none flex items-center px-5 py-4 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 z-10 backdrop-blur-sm">
                 <div className="flex items-center justify-center w-10 h-10 bg-white dark:bg-slate-700 rounded-full mr-4 shadow-sm border border-slate-200 dark:border-slate-600 text-primary-600 dark:text-primary-400">
@@ -286,7 +331,7 @@ const TrouveTonCJE: React.FC<{className?: string}> = ({ className = '' }) => {
                         href={`https://www.google.com/maps/search/?api=1&query=${nearestCJE.latitude},${nearestCJE.longitude}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center justify-center w-full px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-md transition-colors shadow-sm"
+                        className="flex items-center justify-center w-full px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-md transition-colors shadow-sm hover:shadow"
                     >
                         <MapPinIcon className="w-4 h-4 mr-2" />
                         Ouvrir dans Google Maps
@@ -302,6 +347,31 @@ const TrouveTonCJE: React.FC<{className?: string}> = ({ className = '' }) => {
                     </a>
                 </div>
              </div>
+             
+             {/* List of other CJEs if applicable */}
+             {(otherCJEs || []).length > 0 && (
+                 <div className="flex-none px-5 pb-5 bg-white dark:bg-slate-800 border-t border-slate-100 dark:border-slate-700 pt-4">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Autres suggestions</h4>
+                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1 scrollbar-thin">
+                        {(otherCJEs || []).filter(c => c.id !== nearestCJE?.id).map(cje => (
+                             <div 
+                                key={cje.id} 
+                                onClick={() => selectOtherCJE(cje.id)}
+                                className="group p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/30 cursor-pointer transition-all duration-200 hover:bg-white dark:hover:bg-slate-700 hover:shadow-md hover:border-primary-300 dark:hover:border-primary-600 hover:-translate-y-0.5 flex justify-between items-center"
+                             >
+                                <div>
+                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">{cje.nom}</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">{cje.ville}</p>
+                                </div>
+                                <ArrowLongRightIcon className="w-4 h-4 text-slate-300 group-hover:text-primary-500 transition-colors" />
+                             </div>
+                        ))}
+                        {(otherCJEs || []).filter(c => c.id !== nearestCJE?.id).length === 0 && (
+                             <p className="text-xs text-slate-400 italic">Aucune autre suggestion pertinente.</p>
+                        )}
+                    </div>
+                 </div>
+             )}
              
              <div className="flex-none px-5 py-3 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center">
                  <button 

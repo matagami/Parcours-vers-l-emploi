@@ -7,7 +7,7 @@ import { detectSkillsFromText } from '../services/skillsService';
 import { PREFILLED_RESUME_EXAMPLE, PREFILLED_RESUME_DATA } from '../constants';
 import Button from '../components/Button';
 import Card from '../components/Card';
-import { ArrowPathIcon, EnvelopeIcon, PhoneIcon, MapPinIcon, DragHandleIcon, PencilIcon, TrashIcon, ArrowLongRightIcon } from '../components/Icons';
+import { ArrowPathIcon, EnvelopeIcon, PhoneIcon, MapPinIcon, DragHandleIcon, PencilIcon, TrashIcon, ArrowLongRightIcon, CloudArrowUpIcon, DocumentTextIcon, SparklesIcon } from '../components/Icons';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -357,6 +357,15 @@ const ResumePage: React.FC = () => {
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const resumePreviewRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Modal suggestions state
+  const [modalSuggestions, setModalSuggestions] = useState<string[]>([]);
+  const [isModalSuggestionsLoading, setIsModalSuggestionsLoading] = useState(false);
+  
+  // Upload UI states
+  const [inputMode, setInputMode] = useState<'file' | 'text'>('file');
+  const [isDragging, setIsDragging] = useState(false);
+
   const [editingExperience, setEditingExperience] = useState<{index: number, data: ProfessionalExperience} | null>(null);
   const [editingSkill, setEditingSkill] = useState<{index: number, data: Skill} | null>(null);
   const [editingProject, setEditingProject] = useState<{index: number, data: Project} | null>(null);
@@ -420,7 +429,15 @@ const ResumePage: React.FC = () => {
     setTransformError('');
     try {
       const parsed = await parseResumeText(conversationalText);
+      mergeParsedData(parsed);
+    } catch (e: any) {
+      setTransformError(e.message);
+    } finally {
+      setIsTransforming(false);
+    }
+  };
 
+  const mergeParsedData = (parsed: ResumeData) => {
       // Fusionne les informations
       const finalPersonalInfo = {
         name: resumeData.personalInfo.name || parsed.personalInfo.name,
@@ -457,12 +474,6 @@ const ResumePage: React.FC = () => {
         projects: [...(resumeData.projects || []), ...newProjects],
         certifications: [...(resumeData.certifications || []), ...newCertifications],
       });
-
-    } catch (e: any) {
-      setTransformError(e.message);
-    } finally {
-      setIsTransforming(false);
-    }
   };
 
   const fileToBase64 = (file: File): Promise<string> => {
@@ -479,15 +490,8 @@ const ResumePage: React.FC = () => {
       reader.onerror = (error) => reject(error);
     });
   };
-
-  const handleUploadButtonClick = () => {
-      fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
+  
+  const processFile = async (file: File) => {
     setUploadError('');
 
     const isSupported = SUPPORTED_FILE_TYPES.includes(file.type) || file.type.startsWith('image/');
@@ -521,6 +525,33 @@ const ResumePage: React.FC = () => {
         fileInputRef.current.value = "";
       }
     }
+  };
+
+  const handleUploadButtonClick = () => {
+      fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    processFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processFile(file);
   };
 
   const handleSkillToggle = (skill: Skill, isSelected: boolean) => {
@@ -620,6 +651,7 @@ const ResumePage: React.FC = () => {
 
   const handleCloseEditModal = () => {
     setEditingExperience(null);
+    setModalSuggestions([]);
   };
 
   const handleSaveExperience = () => {
@@ -637,6 +669,7 @@ const ResumePage: React.FC = () => {
     }
     
     setEditingExperience(null);
+    setModalSuggestions([]);
   };
 
   const handleEditingExperienceChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -647,6 +680,30 @@ const ResumePage: React.FC = () => {
       data: {
         ...editingExperience.data,
         [name]: value,
+      },
+    });
+  };
+
+  const handleGetModalSuggestions = async () => {
+    if (!editingExperience?.data.description) return;
+    setIsModalSuggestionsLoading(true);
+    try {
+      const result = await getResumeSuggestions(editingExperience.data.description);
+      setModalSuggestions(result);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsModalSuggestionsLoading(false);
+    }
+  };
+
+  const handleApplyModalSuggestion = (suggestion: string) => {
+    if (!editingExperience) return;
+    setEditingExperience({
+      ...editingExperience,
+      data: {
+        ...editingExperience.data,
+        description: suggestion,
       },
     });
   };
@@ -691,7 +748,7 @@ const ResumePage: React.FC = () => {
   const handleEditProject = (index: number) => setEditingProject({ index, data: { ...resumeData.projects[index] } });
   const handleDeleteProject = (index: number) => {
     if(window.confirm("Supprimer ce projet ?")) {
-        setResumeData({...resumeData, projects: resumeData.projects.filter((_, i) => i !== index)});
+        setResumeData({...resumeData, projects: (resumeData.projects || []).filter((_, i) => i !== index)});
     }
   };
   const handleSaveProject = () => {
@@ -708,7 +765,7 @@ const ResumePage: React.FC = () => {
   const handleEditCertification = (index: number) => setEditingCertification({ index, data: { ...resumeData.certifications[index] } });
   const handleDeleteCertification = (index: number) => {
       if(window.confirm("Supprimer cette certification ?")) {
-          setResumeData({...resumeData, certifications: resumeData.certifications.filter((_, i) => i !== index)});
+          setResumeData({...resumeData, certifications: (resumeData.certifications || []).filter((_, i) => i !== index)});
       }
   };
   const handleSaveCertification = () => {
@@ -779,26 +836,71 @@ const ResumePage: React.FC = () => {
         </Card>
 
         <Card>
-          <label className="block text-lg font-medium mb-2">2. Raconte ton parcours (Optionnel)</label>
-          <textarea
-            rows={10}
-            className="w-full p-3 border border-slate-300 rounded-md shadow-sm bg-slate-100 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
-            placeholder="Ex: J'ai travaillé comme caissier chez IGA..."
-            value={conversationalText}
-            onChange={(e) => setConversationalText(e.target.value)}
-            disabled={isUploading}
-          ></textarea>
-           <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*,application/pdf,.doc,.docx" />
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button onClick={() => setConversationalText(PREFILLED_RESUME_EXAMPLE)} variant="secondary" disabled={isUploading}>Remplir avec un exemple</Button>
-            <Button onClick={handleUploadButtonClick} variant="secondary" disabled={isUploading}>{isUploading ? "Téléchargement..." : "Télécharger un CV"}</Button>
-            <Button onClick={handleTransform} isLoading={isTransforming} disabled={!conversationalText.trim() || isUploading}>
-              <span>Transformer le texte</span>
-              <ArrowLongRightIcon className="w-5 h-5 ml-2" />
-            </Button>
+          <h2 className="text-xl font-bold mb-4">2. Raconte ton parcours ou Importe ton CV</h2>
+          
+          <div className="flex border-b border-slate-200 dark:border-slate-700 mb-4">
+            <button
+                onClick={() => setInputMode('file')}
+                className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${inputMode === 'file' ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 border-b-2 border-primary-600' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+            >
+                Importer un fichier
+            </button>
+            <button
+                onClick={() => setInputMode('text')}
+                className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${inputMode === 'text' ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 border-b-2 border-primary-600' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+            >
+                Écrire / Coller
+            </button>
           </div>
-          {transformError && <p className="text-red-500 mt-2">{transformError}</p>}
-          {uploadError && <p className="text-red-500 mt-2">{uploadError}</p>}
+
+          {inputMode === 'file' ? (
+            <div 
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-all ${isDragging ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-primary-400 dark:hover:border-primary-700'}`}
+            >
+                <div className="flex justify-center mb-4">
+                    <CloudArrowUpIcon className={`w-12 h-12 ${isDragging ? 'text-primary-600' : 'text-slate-400'}`} />
+                </div>
+                <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200 mb-2">
+                    {isDragging ? "Déposez le fichier ici" : "Glissez-déposez votre CV ici"}
+                </h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+                    ou cliquez pour sélectionner un fichier (PDF, Word, Image)
+                </p>
+                
+                <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*,application/pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+                
+                <Button onClick={handleUploadButtonClick} variant="primary" isLoading={isUploading}>
+                    Choisir un fichier
+                </Button>
+                
+                <p className="text-xs text-slate-400 mt-4">Formats supportés: PDF, DOCX, JPG, PNG</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+                <textarea
+                    rows={10}
+                    className="w-full p-3 border border-slate-300 rounded-md shadow-sm bg-slate-100 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200 focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="Ex: J'ai travaillé comme caissier chez IGA de 2019 à 2021. J'étais responsable de la caisse et du service client..."
+                    value={conversationalText}
+                    onChange={(e) => setConversationalText(e.target.value)}
+                    disabled={isUploading}
+                ></textarea>
+                
+                <div className="flex flex-wrap gap-2">
+                    <Button onClick={() => setConversationalText(PREFILLED_RESUME_EXAMPLE)} variant="secondary" disabled={isUploading}>Remplir avec un exemple</Button>
+                    <Button onClick={handleTransform} isLoading={isTransforming} disabled={!conversationalText.trim() || isUploading}>
+                        <span>Transformer le texte</span>
+                        <ArrowLongRightIcon className="w-5 h-5 ml-2" />
+                    </Button>
+                </div>
+            </div>
+          )}
+
+          {transformError && <p className="text-red-500 mt-3 text-sm bg-red-50 dark:bg-red-900/20 p-2 rounded border border-red-200">{transformError}</p>}
+          {uploadError && <p className="text-red-500 mt-3 text-sm bg-red-50 dark:bg-red-900/20 p-2 rounded border border-red-200">{uploadError}</p>}
         </Card>
         
         <Card>
@@ -965,6 +1067,36 @@ const ResumePage: React.FC = () => {
                     <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">Description</label>
                         <textarea name="description" rows={4} value={editingExperience.data.description} onChange={handleEditingExperienceChange} className="mt-1 w-full p-2 border border-slate-300 rounded-md shadow-sm bg-slate-100 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200" />
+                        
+                        <div className="mt-2">
+                            <div className="flex justify-end">
+                                <Button 
+                                    onClick={handleGetModalSuggestions} 
+                                    variant="secondary" 
+                                    className="!py-1 text-xs flex items-center"
+                                    isLoading={isModalSuggestionsLoading}
+                                    disabled={!editingExperience.data.description || isModalSuggestionsLoading}
+                                >
+                                    <SparklesIcon className="w-3 h-3 mr-1" />
+                                    Améliorer avec l'IA
+                                </Button>
+                            </div>
+                            
+                            {modalSuggestions.length > 0 && (
+                                <div className="mt-3 space-y-2 bg-slate-50 dark:bg-slate-700/50 p-3 rounded-lg border border-slate-200 dark:border-slate-600">
+                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Suggestions</p>
+                                    {modalSuggestions.map((suggestion, idx) => (
+                                        <div 
+                                            key={idx}
+                                            onClick={() => handleApplyModalSuggestion(suggestion)}
+                                            className="p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded cursor-pointer hover:border-primary-400 hover:shadow-sm transition-all text-sm text-slate-700 dark:text-slate-300"
+                                        >
+                                            {suggestion}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
                 <div className="mt-6 flex justify-end gap-4">

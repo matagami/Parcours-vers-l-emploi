@@ -8,6 +8,7 @@ import ResumePage from './pages/ResumePage';
 import BudgetPage from './pages/BudgetPage';
 import RiasecPage from './pages/RiasecPage';
 import MapPage from './pages/MapPage';
+import ActionPlanPage from './pages/ActionPlanPage';
 import { CheckCircleIcon } from './components/Icons';
 
 const AppFooter = () => {
@@ -65,6 +66,7 @@ function App() {
               <Route path="/cv" element={<ResumePage />} />
               <Route path="/budget" element={<BudgetPage />} />
               <Route path="/orientation" element={<RiasecPage />} />
+              <Route path="/plan-action" element={<ActionPlanPage />} />
               <Route path="/cje" element={<MapPage />} />
             </Routes>
           </main>

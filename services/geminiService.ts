@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { ResumeData, BudgetData, Skill, RiasecInput, RiasecOutput, JobOffer, JobSearchOutput, CjeSearchResponse } from '../types';
+import { ResumeData, BudgetData, Skill, RiasecInput, RiasecOutput, JobOffer, JobSearchOutput, CjeSearchResponse, JobSearchPreparationResponse, RiasecTestPageContent, ActionPlanOutput, DashboardContent } from '../types';
 import { INITIAL_RESUME_DATA, PREFILLED_RESUME_DATA, CJES_DATA } from '../constants';
 
 const API_KEY = process.env.API_KEY;
@@ -10,6 +10,18 @@ if (!API_KEY) {
 }
 
 const ai = API_KEY ? new GoogleGenAI({ apiKey: API_KEY }) : null;
+
+// Helper to clean markdown from JSON response
+const cleanJsonResponse = (text: string): string => {
+  if (!text) return "{}";
+  // Extract content from markdown code blocks if present
+  const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if (match) {
+      return match[1].trim();
+  }
+  // Otherwise return the text trimmed
+  return text.trim();
+};
 
 // Mock Data for Jobs API Simulation
 const MOCK_JOBS_DATA: JobOffer[] = [
@@ -114,6 +126,7 @@ export const parseResumeText = async (text: string): Promise<ResumeData> => {
         - Pour les descriptions, résume les tâches en une seule phrase concise.
         - Pour les compétences, extrais uniquement les compétences mentionnées explicitement par l'utilisateur. N'en invente pas.
         - Si une information n'est pas présente, laisse le champ vide.
+    2. **Pas d'emojis** : Ne jamais utiliser d'emojis ou d'émoticônes dans les champs extraits.
 
     Retourne le résultat complet en format JSON en respectant le schéma fourni.
     
@@ -131,7 +144,7 @@ export const parseResumeText = async (text: string): Promise<ResumeData> => {
       },
     });
 
-    const jsonString = response.text.trim();
+    const jsonString = cleanJsonResponse(response.text);
     const parsedData = JSON.parse(jsonString);
     
     // Sanitize the output and format skills
@@ -177,6 +190,7 @@ export const parseResumeFile = async (base64File: string, mimeType: string): Pro
             - Pour les descriptions, résume les tâches en une seule phrase concise.
             - Pour les compétences, extrais uniquement les compétences clés visibles sur le CV. N'en invente pas.
             - Si une information n'est pas présente, laisse le champ vide.
+        2. **Pas d'emojis** : Ne jamais utiliser d'emojis ou d'émoticônes dans les champs extraits.
 
         Retourne le résultat complet en format JSON en respectant le schéma fourni.
       `
@@ -192,7 +206,7 @@ export const parseResumeFile = async (base64File: string, mimeType: string): Pro
             },
           });
       
-          const jsonString = response.text.trim();
+          const jsonString = cleanJsonResponse(response.text);
           const parsedData = JSON.parse(jsonString);
           
           // Sanitize the output and format skills
@@ -235,6 +249,7 @@ export const getResumeSuggestions = async (description: string): Promise<string[
     2.  **Quantification :** Incorpore des résultats mesurables autant que possible. Si l'utilisateur n'a pas fourni de chiffres, suggère des endroits où il pourrait en ajouter en utilisant des placeholders comme [nombre] ou [pourcentage]%. (ex: "en servant plus de [nombre] clients par jour" ou "réduisant le temps d'attente de [pourcentage]%", "augmentant la satisfaction client").
     3.  **Variété :** Propose trois options distinctes. Chaque option doit mettre en lumière un angle différent de la tâche (ex: une sur l'efficacité, une sur le service client, une sur la responsabilité).
     4.  **Clarté et concision :** Les phrases doivent être claires, concises et professionnelles.
+    5.  **RÈGLE STRICTE : Pas d'emojis.** N'utilise JAMAIS d'emojis ou d'émoticônes dans les suggestions.
 
     Retourne le résultat sous la forme d'un tableau JSON contenant exactement 3 chaînes de caractères. N'ajoute aucun texte avant ou après le tableau JSON.
   `;
@@ -252,7 +267,7 @@ export const getResumeSuggestions = async (description: string): Promise<string[
       },
     });
     
-    const jsonString = response.text.trim();
+    const jsonString = cleanJsonResponse(response.text);
     const suggestions = JSON.parse(jsonString);
 
     // Ensure the response is a valid array of strings
@@ -302,6 +317,8 @@ export const getBudgetAnalysis = async (budget: BudgetData): Promise<string> => 
     - Épargne/Imprévus: ${budget.expenses.emergency}$
     
     Donne 3 conseils ou observations clés (positifs ou constructifs) sous forme de liste à puces pour aider ce jeune à réussir son autonomie financière. Sois concis et direct.
+    
+    RÈGLE STRICTE : Ne JAMAIS utiliser d'emojis ou d'émoticônes.
   `;
 
   try {
@@ -335,96 +352,30 @@ export const getRiasecAnalysis = async (input: RiasecInput): Promise<RiasecOutpu
     }
 
     const prompt = `
-    CONTEXTE
-    Tu es un conseiller d’orientation virtuel pour une application web appelée
-    « Mon parcours vers l’autonomie ». L’application est utilisée au Québec,
-    surtout dans des organismes jeunesse (Carrefour jeunesse-emploi, OBNL, milieu
-    communautaire).
+    RÔLE
+    Tu es un conseiller d’orientation virtuel pour une application web.
+    Ton rôle : à partir des résultats du test RIASEC, produire un portrait clair et motivant.
 
-    Cette section de l’application s’appelle : « Test – établir ton profil RIASEC ».
-
-    Ton rôle : à partir des résultats du test RIASEC, produire un portrait clair,
-    motivante et exploitable par la personne et par un·e intervenant·e.
-
-    PUBLIC CIBLE
-    - Jeunes et adultes en réflexion professionnelle (environ 15 à 35 ans).
-    - Contexte québécois, parfois en région (ex. Nord-du-Québec, Jamésie).
-    - Niveau de langage : simple, accessible, sans jargon.
-
-    TON À UTILISER
-    - Chaleureux, bienveillant, motivant.
-    - Phrases courtes.
-    - Tu tutoies la personne (« tu »).
-    - Tu valorises la personne et son potentiel.
-    - Tu présente le RIASEC comme un outil d’exploration, pas comme une étiquette.
+    RÈGLES ANTI-HALLUCINATION
+    1. Tu ne donnes jamais de diagnostic psychologique.
+    2. Tu ne présentes pas le profil comme figé.
+    3. Si une information est absente (nom, région, âge), tu n’inventes rien.
+    4. Tu NE DOIS JAMAIS utiliser d'emojis ou d'émoticônes.
+    5. Tu respectes strictement le format JSON.
 
     DONNÉES D’ENTRÉE
-    On te fournit un JSON au format suivant :
-
     ${JSON.stringify(input, null, 2)}
-
-    SIGNIFICATION DES LETTRES RIASEC
-    - R : Réaliste
-    - I : Investigateur
-    - A : Artistique
-    - S : Social
-    - E : Entreprenant
-    - C : Conventionnel
 
     TA TÂCHE
     À partir de ces données, tu dois :
-
     1. Identifier les 2 ou 3 lettres RIASEC dominantes en te basant sur les scores.
-    2. Expliquer le profil en langage simple et positif.
+    2. Expliquer le profil en langage simple et positif (ton : chaleureux, "tu").
     3. Mettre en valeur les forces de la personne.
-    4. Proposer des pistes de métiers ou de domaines d’activités cohérentes avec :
-       - le profil RIASEC,
-       - l’objectif (études / emploi / exploration),
-       - le contexte québécois en général.
-    5. Proposer des actions concrètes à court terme (explorer, rencontrer, tester).
-    6. Adapter légèrement le ton si la région est une région éloignée ou nordique
-       (mais sans inventer des informations locales précises).
-    7. Rappeler que le test est un outil de réflexion, pas un verdict.
-
-    CONTRAINTES IMPORTANTES
-    - Tu ne donnes jamais de diagnostic psychologique.
-    - Tu n’utilises pas un ton autoritaire ou définitif.
-    - Tu ne présentes pas le profil comme figé.
-    - Si une information est absente (nom, région, âge), tu n’inventes rien.
-    - Tu restes neutre sur les sujets sensibles (santé, diagnostic, etc.).
+    4. Proposer des pistes de métiers ou de domaines d’activités cohérentes avec le profil et le contexte québécois.
+    5. Proposer des actions concrètes à court terme.
 
     FORMAT DE SORTIE
-    Tu dois TOUJOURS répondre avec un JSON valide, sans texte avant ni après,
-    dans la structure exacte suivante :
-
-    {
-      "titre_profil": "string",
-      "profil_riasec_principal": {
-        "lettres_dominantes": ["X", "Y", "Z"],
-        "description_courte": "string"
-      },
-      "description_detaillee": "string",
-      "forces": [
-        "string",
-        "string",
-        "string"
-      ],
-      "pistes_metiers": [
-        {
-          "intitule": "string",
-          "secteur": "string",
-          "commentaire": "string"
-        }
-      ],
-      "pistes_activites": [
-        {
-          "type": "exploration | benevolat | formation | emploi",
-          "description": "string"
-        }
-      ],
-      "message_motivation": "string",
-      "avertissement": "string"
-    }
+    Tu dois TOUJOURS répondre avec un JSON valide conforme au schéma.
     `;
 
     const schema = {
@@ -476,14 +427,100 @@ export const getRiasecAnalysis = async (input: RiasecInput): Promise<RiasecOutpu
             },
         });
 
-        return JSON.parse(response.text);
+        return JSON.parse(cleanJsonResponse(response.text));
     } catch (error) {
         console.error("Error analysing RIASEC profile:", error);
         throw new Error("Impossible d'analyser le profil pour le moment.");
     }
 };
 
-export const getJobSuggestions = async (riasecProfile: string[], region: string): Promise<JobSearchOutput> => {
+export const prepareJobSearch = async (riasecProfile: string[], region: string | null, objectif: string): Promise<JobSearchPreparationResponse> => {
+  if (!ai) {
+    return Promise.resolve({
+      ui: {
+        section_title: "Trouver des emplois selon ton profil",
+        intro_text: "Voici une simulation de la section de recherche d'emploi.",
+        explication: "En l'absence de clé API, nous utilisons des données simulées.",
+        bouton_lancer_recherche: "Voir les offres (Démo)"
+      },
+      parametres_recherche: {
+        mots_cles: ["démo", "emploi", "test"],
+        region: region,
+        type_emploi: "temps_plein",
+        secteurs_suggeres: ["Administration", "Vente"]
+      },
+      message_global: "Mode démo actif."
+    });
+  }
+
+  const input = {
+    profil_riasec: riasecProfile,
+    region: region,
+    objectif: objectif
+  };
+
+  const prompt = `
+    RÔLE
+    Tu es un assistant IA qui prépare la transition vers la recherche d'emploi.
+    
+    RÈGLES ANTI-HALLUCINATION
+    1. Ne JAMAIS utiliser d'emojis ou d'émoticônes.
+    2. Reste factuel et motivant.
+    3. Utilise le "tu".
+
+    ENTRÉE
+    ${JSON.stringify(input, null, 2)}
+
+    BUT
+    Générer l'UI et les paramètres de recherche pour la section emplois.
+
+    FORMAT DE SORTIE
+    JSON valide selon le schéma.
+  `;
+
+  const schema = {
+    type: Type.OBJECT,
+    properties: {
+      ui: {
+        type: Type.OBJECT,
+        properties: {
+          section_title: { type: Type.STRING },
+          intro_text: { type: Type.STRING },
+          explication: { type: Type.STRING },
+          bouton_lancer_recherche: { type: Type.STRING }
+        }
+      },
+      parametres_recherche: {
+        type: Type.OBJECT,
+        properties: {
+          mots_cles: { type: Type.ARRAY, items: { type: Type.STRING } },
+          region: { type: Type.STRING },
+          type_emploi: { type: Type.STRING },
+          secteurs_suggeres: { type: Type.ARRAY, items: { type: Type.STRING } }
+        }
+      },
+      message_global: { type: Type.STRING }
+    }
+  };
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: schema,
+      },
+    });
+
+    return JSON.parse(cleanJsonResponse(response.text));
+  } catch (error) {
+    console.error("Error preparing job search:", error);
+    throw new Error("Impossible de préparer la recherche d'emploi.");
+  }
+};
+
+export const getJobSuggestions = async (riasecProfile: string[], region: string, keywords: string[] = [], typeEmploi: string | null = null): Promise<JobSearchOutput> => {
     if (!ai) {
         return Promise.resolve({
             resultats_filtrés: [
@@ -506,6 +543,8 @@ export const getJobSuggestions = async (riasecProfile: string[], region: string)
 
     const input = {
         profil_riasec: riasecProfile,
+        mots_cles_suggeres: keywords,
+        type_emploi_suggere: typeEmploi,
         secteur_cible: null, // Optional based on implementation
         region: region,
         emplois_api: MOCK_JOBS_DATA // Feeding the mock data as "API" data
@@ -513,67 +552,23 @@ export const getJobSuggestions = async (riasecProfile: string[], region: string)
 
     const prompt = `
     RÔLE
-    Tu es un assistant intelligence artificielle utilisé dans une application Web liée à un site WordPress.
-    Cet onglet s’appelle « Trouver des emplois selon ton profil RIASEC ».
-    Tu analyses un profil RIASEC et une région pour proposer les meilleures pistes d’emploi au Québec.
+    Tu es un assistant IA qui filtre des offres d'emploi selon un profil RIASEC.
 
-    TON
-    - Motivant.
-    - Simple.
-    - Phrases courtes.
-    - Tu t’adresses à l’utilisateur avec « tu ».
+    RÈGLES ANTI-HALLUCINATION
+    1. Ne JAMAIS inventer d'offres d'emploi. Utilise uniquement "emplois_api" fourni en entrée.
+    2. Ne JAMAIS utiliser d'emojis ou d'émoticônes.
+    3. Reste factuel.
 
     ENTRÉE
-    Le système t’envoie ce JSON :
-
     ${JSON.stringify(input, null, 2)}
 
-    EXPLICATION
-    - "emplois_api" = données brutes venant d’une API d’offres d’emploi.
-    - Tu NE dois PAS inventer d’offres.
-    - Tu filtres, clarifies, restructures, expliques.
-    - Tu gardes seulement ce qui correspond au profil RIASEC.
-
     TA TÂCHE
-    1. Lire le profil RIASEC.
-    2. Associer les lettres dominantes à des mots-clés métiers.
-    3. Parcourir les offres reçues.
-    4. Trier les offres selon :
-       - cohérence RIASEC
-       - cohérence secteur
-       - cohérence région
-    5. Garder entre 5 et 12 offres maximales.
-    6. Pour chaque offre retenue :
-       - créer un "score_pertinence" (0–100)
-       - générer un résumé court (2–3 phrases)
-       - expliquer en 1 phrase pourquoi l’emploi est pertinent pour l’utilisateur.
+    1. Filtrer les offres cohérentes avec le profil RIASEC et la région.
+    2. Créer un score de pertinence.
+    3. Expliquer le match en 1 phrase.
 
     FORMAT DE SORTIE
-    Réponds **uniquement** ce JSON :
-
-    {
-      "resultats_filtrés": [
-        {
-          "id": "string",
-          "titre": "string",
-          "employeur": "string",
-          "lieu": "string",
-          "type_emploi": "string",
-          "url": "string",
-          "score_pertinence": 0,
-          "tags_riasec": ["X","Y"],
-          "resume": "string",
-          "raison_match": "string"
-        }
-      ],
-      "message_global": "string"
-    }
-
-    CONTRAINTES
-    - Pas de texte en dehors du JSON.
-    - Pas d’invention de métiers ni d’employeurs.
-    - Si peu d’offres sont pertinentes, tu expliques dans "message_global".
-    - Ton ton reste positif et encourageant.
+    JSON valide uniquement.
     `;
     
     const schema = {
@@ -611,7 +606,7 @@ export const getJobSuggestions = async (riasecProfile: string[], region: string)
             },
         });
 
-        return JSON.parse(response.text);
+        return JSON.parse(cleanJsonResponse(response.text));
     } catch (error) {
         console.error("Error getting job suggestions:", error);
         throw new Error("Impossible de trouver des emplois pour le moment.");
@@ -623,12 +618,16 @@ export const findBestCJE = async (ville: string, codePostal: string): Promise<Cj
         // Mock Fallback
         const closest = CJES_DATA[0];
         return Promise.resolve({
-            ui: {
+            dashboard_button_ui: {
+              label: "Trouve ton CJE",
+              description: "Entre ta ville ou ton code postal pour savoir quel CJE peut t’aider."
+            },
+            page_ui: {
                 page_title: "Trouve ton Carrefour jeunesse-emploi",
                 intro_text: "Entre ta ville ou ton code postal pour savoir quel CJE peut t’aider.",
-                form_labels: {
-                  ville: "Entre ta ville",
-                  code_postal: "Entre ton code postal",
+                form: {
+                  ville: { label: "Entre ta ville", placeholder: "ex: Montréal" },
+                  code_postal: { label: "Entre ton code postal", placeholder: "ex: H2X 1Y2" },
                   bouton_rechercher: "Trouver mon CJE"
                 },
                 messages: {
@@ -665,112 +664,56 @@ export const findBestCJE = async (ville: string, codePostal: string): Promise<Cj
 
     const prompt = `
     RÔLE
-    Tu es un assistant utilisé dans une application Web liée à un site WordPress.
-    Tu ne fais PAS partie d’un tableau de bord.  
-    Tu alimentes une page autonome intitulée : « Trouve ton CJE ».
+    Tu es un assistant pour trouver le bon Carrefour Jeunesse-Emploi (CJE).
 
-    Cette page sert à aider une personne à trouver le Carrefour jeunesse-emploi
-    le plus logique pour elle, à partir de sa ville ou de son code postal au Québec.
-
-    TON
-    - Simple.
-    - Chaleureux.
-    - Motivant.
-    - Phrases courtes.
-    - Tu tutoies.
+    RÈGLES ANTI-HALLUCINATION
+    1. Tu n'inventes aucune donnée CJE. Utilise la liste fournie.
+    2. Ne JAMAIS utiliser d'emojis ou d'émoticônes.
+    3. Reste factuel.
 
     ENTRÉE
-    Le système t’envoie ce JSON :
     ${JSON.stringify(input, null, 2)}
 
-    RÈGLES D’INTERPRÉTATION
-    - L’utilisateur tape sa ville OU son code postal (parfois les deux).
-    - Tu n’as pas de géolocalisation automatique.
-    - Tu essaies de trouver les CJE les plus logiques :
-
-      - Si "ville" est renseignée :
-        - privilégier les CJE dans cette ville,
-        - sinon, dans une ville proche ou dans la même région (si les données le permettent).
-
-      - Si "code_postal" est renseigné :
-        - tu peux comparer les 1 à 3 premiers caractères (ex.: G8P, H2X),
-        - tu t’en sers pour approcher la zone.
-
-    - Si les deux sont fournis, tu utilises en priorité la ville, puis le code postal en soutien.
-
-    COMPORTEMENT
-    1. Vérifier s’il y a au moins une information (ville ou code postal).
-    2. Si aucune info → préparer un message d’erreur adapté à l’interface.
-    3. Identifier :
-       - un CJE principal ("cje_plus_proche" logique),
-       - jusqu’à 3 bons choix ("top_3_cjes").
-    4. Pour le CJE principal :
-       - expliquer en une phrase courte pourquoi il est pertinent pour la personne.
-    5. Générer un lien Google Maps pour chaque CJE :
-       - https://www.google.com/maps/search/?api=1&query=LAT,LON
-
-    TU DOIS AUSSI FOURNIR LES TEXTES D’INTERFACE DE LA PAGE :
-    - titre de la page,
-    - texte d’introduction,
-    - labels des champs,
-    - texte du bouton,
-    - messages d’aide / d’erreur.
+    TA TÂCHE
+    1. Générer les textes de l'interface (bouton dashboard, page recherche).
+    2. Trouver le CJE le plus proche selon l'entrée utilisateur.
 
     FORMAT DE SORTIE
-    Tu dois toujours répondre avec ce JSON, sans texte autour :
-
-    {
-      "ui": {
-        "page_title": "string",
-        "intro_text": "string",
-        "form_labels": {
-          "ville": "string",
-          "code_postal": "string",
-          "bouton_rechercher": "string"
-        },
-        "messages": {
-          "info_initiale": "string",
-          "aucune_entree": "string",
-          "aucun_resultat": "string",
-          "resultats_trouves": "string"
-        }
-      },
-      "cje_plus_proche": {
-        "id": "string|null",
-        "nom": "string|null",
-        "ville": "string|null",
-        "adresse": "string|null",
-        "siteWeb": "string|null",
-        "telephone": "string|null",
-        "raison_selection": "string|null",
-        "lien_google_maps": "string|null"
-      },
-      "top_3_cjes": [
-        {
-          "id": "string",
-          "nom": "string",
-          "ville": "string",
-          "adresse": "string",
-          "lien_google_maps": "string"
-        }
-      ],
-      "message_global": "string"
-    }
+    JSON valide uniquement.
     `;
 
     const schema = {
         type: Type.OBJECT,
         properties: {
-            ui: {
+            dashboard_button_ui: {
+              type: Type.OBJECT,
+              properties: {
+                label: { type: Type.STRING },
+                description: { type: Type.STRING }
+              }
+            },
+            page_ui: {
                 type: Type.OBJECT,
                 properties: {
                     page_title: { type: Type.STRING },
                     intro_text: { type: Type.STRING },
-                    form_labels: {
+                    form: {
                         type: Type.OBJECT,
                         properties: {
-                            ville: { type: Type.STRING },
-                            code_postal: { type: Type.STRING },
+                            ville: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    label: { type: Type.STRING },
+                                    placeholder: { type: Type.STRING }
+                                }
+                            },
+                            code_postal: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    label: { type: Type.STRING },
+                                    placeholder: { type: Type.STRING }
+                                }
+                            },
                             bouton_rechercher: { type: Type.STRING }
                         }
                     },
@@ -825,9 +768,373 @@ export const findBestCJE = async (ville: string, codePostal: string): Promise<Cj
             },
         });
 
-        return JSON.parse(response.text);
+        return JSON.parse(cleanJsonResponse(response.text));
     } catch (error) {
         console.error("Error finding CJE:", error);
         throw new Error("Impossible de trouver le CJE pour le moment.");
     }
 }
+
+export const getRiasecTestPageContent = async (questions: any): Promise<RiasecTestPageContent> => {
+    if (!ai) {
+        // Fallback mock data
+        return Promise.resolve({
+            dashboard_button_ui: {
+                label: "Passe le test RIASEC",
+                description: "Découvre ton profil en répondant à quelques questions.",
+                tailwind_classes: "inline-flex items-center justify-center px-4 py-2 w-full rounded-lg bg-primary-600 text-white shadow hover:bg-primary-700",
+                react_snippet: ""
+            },
+            test_page_ui: {
+                page_title: "Ton test RIASEC",
+                intro_text: "Ce test t’aide à mieux comprendre ce que tu aimes faire. Réponds spontanément !",
+                explication_riasec: {
+                    texte_court: "Le modèle RIASEC t’aide à explorer ce que tu aimes faire. Chaque lettre représente un style d’intérêts.",
+                    definitions: {
+                        R: "Réaliste : Tu aimes le concret, le manuel, le plein air.",
+                        I: "Investigateur : Tu es curieux, tu aimes comprendre et analyser.",
+                        A: "Artistique : Tu es créatif, original et expressif.",
+                        S: "Social : Tu aimes aider, écouter et être avec les gens.",
+                        E: "Entreprenant : Tu as du leadership et tu aimes convaincre.",
+                        C: "Conventionnel : Tu aimes l'ordre, la structure et l'organisation."
+                    }
+                },
+                progression: {
+                    type: "barre",
+                    description: "Ta progression s’ajuste au fur et à mesure."
+                },
+                instructions: "1. Lis chaque question.\n2. Répond instinctivement.\n3. Sois honnête avec toi-même.",
+                form_structure: {
+                    dimensions: [
+                        { code: "R", titre: "Réaliste", questions: questions.R || [] },
+                        { code: "I", titre: "Investigateur", questions: questions.I || [] },
+                        { code: "A", titre: "Artistique", questions: questions.A || [] },
+                        { code: "S", titre: "Social", questions: questions.S || [] },
+                        { code: "E", titre: "Entreprenant", questions: questions.E || [] },
+                        { code: "C", titre: "Conventionnel", questions: questions.C || [] }
+                    ],
+                    bouton_soumettre: "Voir mon profil RIASEC"
+                }
+            }
+        });
+    }
+
+    const input = {
+        mode: "questions_courtes",
+        questions: questions
+    };
+
+    const prompt = `
+    RÔLE
+    Tu es un assistant IA qui génère l'interface du test RIASEC.
+
+    RÈGLES ANTI-HALLUCINATION
+    1. Ne JAMAIS utiliser d'emojis ou d'émoticônes.
+    2. Reste factuel et encourageant.
+    
+    ENTRÉE
+    ${JSON.stringify(input, null, 2)}
+
+    TA TÂCHE
+    Générer les textes de l'interface du test RIASEC.
+
+    FORMAT DE SORTIE
+    JSON valide uniquement.
+    `;
+
+    const schema = {
+        type: Type.OBJECT,
+        properties: {
+            dashboard_button_ui: {
+                type: Type.OBJECT,
+                properties: {
+                    label: { type: Type.STRING },
+                    description: { type: Type.STRING },
+                    tailwind_classes: { type: Type.STRING },
+                    react_snippet: { type: Type.STRING }
+                }
+            },
+            test_page_ui: {
+                type: Type.OBJECT,
+                properties: {
+                    page_title: { type: Type.STRING },
+                    intro_text: { type: Type.STRING },
+                    explication_riasec: {
+                        type: Type.OBJECT,
+                        properties: {
+                            texte_court: { type: Type.STRING },
+                            definitions: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    R: { type: Type.STRING },
+                                    I: { type: Type.STRING },
+                                    A: { type: Type.STRING },
+                                    S: { type: Type.STRING },
+                                    E: { type: Type.STRING },
+                                    C: { type: Type.STRING }
+                                }
+                            }
+                        }
+                    },
+                    progression: {
+                        type: Type.OBJECT,
+                        properties: {
+                            type: { type: Type.STRING },
+                            description: { type: Type.STRING }
+                        }
+                    },
+                    instructions: { type: Type.STRING },
+                    form_structure: {
+                        type: Type.OBJECT,
+                        properties: {
+                            dimensions: {
+                                type: Type.ARRAY,
+                                items: {
+                                    type: Type.OBJECT,
+                                    properties: {
+                                        code: { type: Type.STRING },
+                                        titre: { type: Type.STRING },
+                                        questions: { type: Type.ARRAY, items: { type: Type.STRING } }
+                                    }
+                                }
+                            },
+                            bouton_soumettre: { type: Type.STRING }
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                responseMimeType: 'application/json',
+                responseSchema: schema,
+            },
+        });
+
+        return JSON.parse(cleanJsonResponse(response.text));
+    } catch (error) {
+        console.error("Error getting RIASEC page content:", error);
+        throw new Error("Impossible de charger le contenu du test.");
+    }
+};
+
+export const getMockDashboardContent = (context: any): DashboardContent => {
+    return {
+        ui: {
+            welcome_title: `Bonjour ${context.utilisateur?.nom || "!"}`,
+            welcome_text: "Bienvenue sur ton espace d'autonomie. Voici ce qu'on te suggère pour avancer."
+        },
+        dashboard_cards: [
+            {
+                id: "resultats_riasec",
+                visible: !!context.etat?.test_riasec_passe,
+                titre: "Ton profil RIASEC",
+                description: `Ton profil dominant est ${context.etat?.profil_riasec ? context.etat.profil_riasec.join('') : 'inconnu'}. Revois tes résultats et tes pistes de métier.`,
+                cta_label: "Voir mon profil",
+                tailwind_classes: "bg-white"
+            },
+             {
+                id: "plan_action",
+                visible: !!context.etat?.plan_action_genere,
+                titre: "Ton Plan d'action",
+                description: "Suis les étapes personnalisées pour atteindre tes objectifs.",
+                cta_label: "Voir mon plan",
+                tailwind_classes: "bg-white"
+            }
+        ],
+        message_global: "N'hésite pas à explorer tous les outils disponibles !"
+    };
+};
+
+export const getDashboardContent = async (context: any): Promise<DashboardContent> => {
+    if (!ai) {
+        return getMockDashboardContent(context);
+    }
+
+    const prompt = `
+    RÔLE
+    Tu es le cerveau d'un tableau de bord intelligent pour une application d'autonomie jeunesse.
+
+    CONTEXTE UTILISATEUR
+    ${JSON.stringify(context, null, 2)}
+
+    TA TÂCHE
+    Générer le contenu du tableau de bord pour guider l'utilisateur vers la prochaine étape logique.
+    1. Adapte le titre et le texte de bienvenue.
+    2. Sélectionne et ordonne les cartes pertinentes.
+    3. RÈGLE ABSOLUE: Ne JAMAIS générer de cartes pour inviter à utiliser les outils de base (passer le test RIASEC, faire son CV, faire son budget, trouver un CJE). Ces outils sont fixes dans l'interface en bas.
+    4. Génère UNIQUEMENT des cartes de "Résultats" ou de "Suivi" si les données existent dans le contexte :
+       - id: 'resultats_riasec' (seulement si context.etat.test_riasec_passe est vrai).
+       - id: 'plan_action' (seulement si context.etat.plan_action_genere est vrai).
+    5. Si aucune donnée de résultat n'est disponible (test pas passé, pas de plan), retourne un tableau 'dashboard_cards' VIDE.
+
+    RÈGLES
+    - Pas d'emojis.
+    - Ton encourageant et dynamique.
+
+    FORMAT DE SORTIE
+    JSON valide.
+    `;
+
+    const schema = {
+        type: Type.OBJECT,
+        properties: {
+            ui: {
+                type: Type.OBJECT,
+                properties: {
+                    welcome_title: { type: Type.STRING },
+                    welcome_text: { type: Type.STRING }
+                }
+            },
+            dashboard_cards: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        id: { type: Type.STRING },
+                        visible: { type: Type.BOOLEAN },
+                        titre: { type: Type.STRING },
+                        description: { type: Type.STRING },
+                        cta_label: { type: Type.STRING },
+                        tailwind_classes: { type: Type.STRING }
+                    }
+                }
+            },
+            message_global: { type: Type.STRING }
+        }
+    };
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                responseMimeType: 'application/json',
+                responseSchema: schema,
+            },
+        });
+
+        return JSON.parse(cleanJsonResponse(response.text));
+    } catch (error) {
+        console.error("Error generating dashboard content:", error);
+        // Fallback
+        return getMockDashboardContent(context);
+    }
+};
+
+export const generateActionPlan = async (inputData: any): Promise<ActionPlanOutput> => {
+    if (!ai) {
+        // Fallback mock
+         return Promise.resolve({
+            ui: {
+                page_title: "Ton plan d'action (Démo)",
+                intro_text: "Voici un plan généré automatiquement car l'API n'est pas configurée."
+            },
+            resume_profil: {
+                lettres: ["R", "I"],
+                description: "Profil réaliste et investigateur."
+            },
+            actions_prioritaires: ["Faire son CV", "Chercher des offres"],
+            actions_moyen_terme: ["Préparer des entrevues", "Contacter des employeurs"],
+            objectif_principal: {
+                titre: "Trouver un emploi",
+                description: "Objectif principal de trouver un emploi dans le domaine de la construction."
+            },
+            ressources_region: [
+                { nom: "CJE local", type: "Emploi", lien: "#" }
+            ],
+            cta_suite: {
+                texte: "Voir les CJE",
+                description: "Trouve de l'aide près de chez toi."
+            },
+            message_final: "Bon courage !"
+        });
+    }
+
+    const prompt = `
+    RÔLE
+    Tu es un coach de carrière pour jeunes adultes.
+
+    RÈGLES ANTI-HALLUCINATION
+    1. Ne JAMAIS utiliser d'emojis.
+    2. Sois concret et direct.
+
+    ENTRÉE
+    ${JSON.stringify(inputData, null, 2)}
+
+    TA TÂCHE
+    Générer un plan d'action personnalisé pour l'autonomie.
+
+    FORMAT DE SORTIE
+    JSON valide.
+    `;
+
+    const schema = {
+        type: Type.OBJECT,
+        properties: {
+            ui: {
+                type: Type.OBJECT,
+                properties: {
+                    page_title: { type: Type.STRING },
+                    intro_text: { type: Type.STRING }
+                }
+            },
+            resume_profil: {
+                type: Type.OBJECT,
+                properties: {
+                    lettres: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    description: { type: Type.STRING }
+                }
+            },
+            actions_prioritaires: { type: Type.ARRAY, items: { type: Type.STRING } },
+            actions_moyen_terme: { type: Type.ARRAY, items: { type: Type.STRING } },
+            objectif_principal: {
+                type: Type.OBJECT,
+                properties: {
+                    titre: { type: Type.STRING },
+                    description: { type: Type.STRING }
+                }
+            },
+            ressources_region: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        nom: { type: Type.STRING },
+                        type: { type: Type.STRING },
+                        lien: { type: Type.STRING, nullable: true }
+                    }
+                }
+            },
+            cta_suite: {
+                type: Type.OBJECT,
+                properties: {
+                    texte: { type: Type.STRING },
+                    description: { type: Type.STRING }
+                }
+            },
+            message_final: { type: Type.STRING }
+        }
+    };
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                responseMimeType: 'application/json',
+                responseSchema: schema,
+            },
+        });
+
+        return JSON.parse(cleanJsonResponse(response.text));
+    } catch (error) {
+        console.error("Error generating action plan:", error);
+        throw new Error("Impossible de générer le plan d'action.");
+    }
+};

@@ -100,6 +100,43 @@ export interface RiasecOutput {
     avertissement: string;
 }
 
+export interface RiasecTestPageContent {
+  dashboard_button_ui: {
+    label: string;
+    description: string;
+    tailwind_classes: string;
+    react_snippet: string;
+  };
+  test_page_ui: {
+    page_title: string;
+    intro_text: string;
+    explication_riasec: {
+      texte_court: string;
+      definitions: {
+        R: string;
+        I: string;
+        A: string;
+        S: string;
+        E: string;
+        C: string;
+      };
+    };
+    progression: {
+      type: string;
+      description: string;
+    };
+    instructions: string;
+    form_structure: {
+      dimensions: Array<{
+        code: string;
+        titre: string;
+        questions: string[];
+      }>;
+      bouton_soumettre: string;
+    };
+  };
+}
+
 export interface JobOffer {
   id: string;
   titre: string;
@@ -126,6 +163,22 @@ export interface JobSearchOutput {
   message_global: string;
 }
 
+export interface JobSearchPreparationResponse {
+  ui: {
+    section_title: string;
+    intro_text: string;
+    explication: string;
+    bouton_lancer_recherche: string;
+  };
+  parametres_recherche: {
+    mots_cles: string[];
+    region: string | null;
+    type_emploi: string | null;
+    secteurs_suggeres: string[];
+  };
+  message_global: string;
+}
+
 export interface CJE {
   id: string;
   nom: string;
@@ -138,12 +191,16 @@ export interface CJE {
 }
 
 export interface CjeSearchResponse {
-  ui: {
+  dashboard_button_ui: {
+    label: string;
+    description: string;
+  };
+  page_ui: {
     page_title: string;
     intro_text: string;
-    form_labels: {
-      ville: string;
-      code_postal: string;
+    form: {
+      ville: { label: string; placeholder: string };
+      code_postal: { label: string; placeholder: string };
       bouton_rechercher: string;
     };
     messages: {
@@ -170,5 +227,50 @@ export interface CjeSearchResponse {
     adresse: string;
     lien_google_maps: string;
   }>;
+  message_global: string;
+}
+
+export interface ActionPlanOutput {
+  ui: {
+    page_title: string;
+    intro_text: string;
+  };
+  resume_profil: {
+    lettres: string[];
+    description: string;
+  };
+  actions_prioritaires: string[];
+  actions_moyen_terme: string[];
+  objectif_principal: {
+    titre: string;
+    description: string;
+  };
+  ressources_region: Array<{
+    nom: string;
+    type: string;
+    lien: string | null;
+  }>;
+  cta_suite: {
+    texte: string;
+    description: string;
+  };
+  message_final: string;
+}
+
+export interface DashboardCard {
+  id: string;
+  visible: boolean;
+  titre: string;
+  description: string;
+  cta_label: string;
+  tailwind_classes: string;
+}
+
+export interface DashboardContent {
+  ui: {
+    welcome_title: string;
+    welcome_text: string;
+  };
+  dashboard_cards: DashboardCard[];
   message_global: string;
 }
